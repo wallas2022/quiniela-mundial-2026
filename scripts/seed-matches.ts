@@ -29,7 +29,7 @@ const FLAG_CODES: Record<string, string> = {
   'Jordan': 'jo', 'Haiti': 'ht', 'Curacao': 'cw', 'Bolivia': 'bo',
   'Chile': 'cl', 'Peru': 'pe', 'Israel': 'il', 'Greece': 'gr',
   'Iceland': 'is', 'Norway': 'no', 'Sweden': 'se', 'Finland': 'fi',
-  'Ireland': 'ie', 'Wales': 'gb-wls', 'Slovenia': 'si', 'Serbia': 'rs',
+  'Ireland': 'ie', 'Wales': 'gb-wls', 'Slovenia': 'si', 
   'North Macedonia': 'mk', 'Bosnia and Herzegovina': 'ba', 'Kosovo': 'xk',
   'Montenegro': 'me', 'Bulgaria': 'bg', 'Belarus': 'by',
 }
