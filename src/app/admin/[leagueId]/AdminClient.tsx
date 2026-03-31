@@ -1,6 +1,7 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 type Member = {
@@ -135,6 +136,7 @@ export default function AdminClient({
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+  const router = useRouter()
 
   const [tab, setTab]                       = useState<'members'|'payments'|'pozo'>('members')
   const [isPending, start]                  = useTransition()
@@ -143,6 +145,10 @@ export default function AdminClient({
   const [modalUrl, setModalUrl]             = useState<string | null>(null)
   const [modalPaymentId, setModalPaymentId] = useState<string | null>(null)
   const [modalStatus, setModalStatus]       = useState<string>('')
+
+  // Sincronizar estado cuando el servidor refresca los datos
+  useEffect(() => { setLocalMembers(members) },   [members])
+  useEffect(() => { setLocalPayments(payments) }, [payments])
 
   const approved    = localMembers.filter(m => m.status === 'approved').length
   const pending     = localMembers.filter(m => m.status === 'pending').length
@@ -163,28 +169,30 @@ export default function AdminClient({
     start(async () => {
       await supabase.from('league_members').update({ status }).eq('id', memberId)
       setLocalMembers(prev => prev.map(m => m.id === memberId ? { ...m, status } : m))
+      router.refresh()
     })
   }
 
   async function updatePayment(paymentId: string, status: string) {
-    start(async () => {
-      await supabase.from('payments')
-        .update({ status, reviewed_by: adminId }).eq('id', paymentId)
-      setLocalPayments(prev => prev.map(p => p.id === paymentId ? { ...p, status } : p))
-      setModalStatus(status)
-      if (status !== 'pending') setModalUrl(null)
-    })
-  }
+  start(async () => {
+    const { data, error } = await supabase
+      .from('payments')
+      .update({ status, reviewed_by: adminId })
+      .eq('id', paymentId)
+      .select()
 
-  function isLocked(match: Math): boolean {
-  const kickoff  = new Date(match.kickoff_at)
-  const oneMin   = 1 * 60 * 1000
-  const lockTime = new Date(kickoff.getTime() - oneMin)
-  
-  return (
-    match.status !== 'scheduled' ||
-    new Date() >= lockTime
-  )
+    console.log('updatePayment result:', { data, error })
+
+    if (error) {
+      console.error('Error updating payment:', error)
+      return
+    }
+
+    setLocalPayments(prev => prev.map(p => p.id === paymentId ? { ...p, status } : p))
+    setModalStatus(status)
+    if (status !== 'pending') setModalUrl(null)
+    router.refresh()
+  })
 }
 
   async function openVoucher(payment: Payment) {
@@ -282,9 +290,7 @@ export default function AdminClient({
                     <div className="flex items-center gap-2">
                       <StatusBadge status={m.status} />
                       {getPhone(m.user_id) !== '—' && (
-                        <span className="text-xs text-gray-600">
-                          {getPhone(m.user_id)}
-                        </span>
+                        <span className="text-xs text-gray-600">{getPhone(m.user_id)}</span>
                       )}
                     </div>
                   </div>
