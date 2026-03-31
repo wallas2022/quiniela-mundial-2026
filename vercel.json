@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/sync?token=mundialFootball$2026",
-      "schedule": "*/300 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
