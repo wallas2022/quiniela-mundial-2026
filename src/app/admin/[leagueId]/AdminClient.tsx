@@ -176,6 +176,17 @@ export default function AdminClient({
     })
   }
 
+  function isLocked(match: Math): boolean {
+  const kickoff  = new Date(match.kickoff_at)
+  const oneMin   = 1 * 60 * 1000
+  const lockTime = new Date(kickoff.getTime() - oneMin)
+  
+  return (
+    match.status !== 'scheduled' ||
+    new Date() >= lockTime
+  )
+}
+
   async function openVoucher(payment: Payment) {
     if (!payment.voucher_url) return
     const { data } = await supabase.storage

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, use } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function PaymentPage({
@@ -9,6 +9,9 @@ export default function PaymentPage({
 }: {
   params: Promise<{ leagueId: string }>
 }) {
+
+  const searchParams = useSearchParams()
+  const reason = searchParams.get('reason')
   const { leagueId } = use(params)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,7 +127,17 @@ export default function PaymentPage({
           ← {league?.name}
         </Link>
       </nav>
-
+       {reason === 'no_payment' && (
+        <div className="bg-amber-900/30 border border-amber-800 rounded-xl p-4 mb-5">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <p className="text-sm text-amber-300">
+              Necesitás tener el pago aprobado para poder pronosticar.
+              Subí tu comprobante y esperá la confirmación del admin.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="max-w-sm mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-xl font-medium">Comprobante de pago</h1>
