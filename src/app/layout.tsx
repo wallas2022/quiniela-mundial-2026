@@ -13,7 +13,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body className="min-h-screen flex flex-col bg-gray-950">
+        <main className="flex-1">
+          {children}
+        </main>
+        <footer className="border-t border-gray-800 py-4 px-6">
+          <p className="text-center text-xs text-gray-600">
+            © {new Date().getFullYear()} Walter Rosales · Todos los derechos reservados
+          </p>
+        </footer>
+      </body>
     </html>
   )
 }
