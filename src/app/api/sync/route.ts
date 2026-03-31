@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   // Verificar token de seguridad
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')
-
+ //console.log('Sync request received. Token valid:', token , process.env.CRON_SECRET)
   if (token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
