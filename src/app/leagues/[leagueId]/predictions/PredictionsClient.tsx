@@ -173,9 +173,10 @@ export default function PredictionsClient({
                                         </span>
                                         : <span className="text-xs text-gray-500">
                                             {new Date(m.kickoff_at).toLocaleDateString('es-GT', {
-                                                month: 'short', day: 'numeric',
-                                                hour: '2-digit', minute: '2-digit'
-                                            })}
+                                        month:'short', day:'numeric',
+                                        hour:'2-digit', minute:'2-digit',
+                                        timeZone: 'America/Guatemala'  // ← agregar esto
+                                        })}
                                         </span>
                                     }
                                 </div>

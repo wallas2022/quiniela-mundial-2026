@@ -170,10 +170,11 @@ export default async function LeaguePage({
                     width={20} height={14} className="rounded-sm" alt={m.away_team} />
                 </div>
                 <div className="text-xs text-gray-400">
-                  {new Date(m.kickoff_at).toLocaleDateString('es-GT', {
-                    month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                  })}
+                {new Date(m.kickoff_at).toLocaleDateString('es-GT', {
+                  month:'short', day:'numeric',
+                  hour:'2-digit', minute:'2-digit',
+                  timeZone: 'America/Guatemala'  // ← agregar esto
+                })}
                 </div>
               </div>
             ))}
