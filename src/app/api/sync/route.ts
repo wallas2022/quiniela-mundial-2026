@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { notifyMatchResult } from '@/lib/email'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   { auth: { persistSession: false } }
 )
-
 const FLAG_CODES: Record<string, string> = {
   // ── Selecciones nacionales ──────────────────────────────────────────
   'Mexico': 'mx', 'Argentina': 'ar', 'Brazil': 'br', 'France': 'fr',
@@ -197,7 +197,22 @@ export async function GET(request: Request) {
         .eq('external_id', String(m.id))
     }
 
-    // 2. Partidos terminados o en vivo con marcador → actualizar resultado
+    // 2. Detectar qué partidos van a terminar en esta pasada (para notificar después)
+    const justFinishedExternalIds = matches
+      .filter((m: any) => m.status === 'FINISHED')
+      .map((m: any) => String(m.id))
+
+    const { data: notYetFinished } = justFinishedExternalIds.length
+      ? await supabase
+          .from('matches')
+          .select('id')
+          .in('external_id', justFinishedExternalIds)
+          .neq('status', 'finished')
+      : { data: [] as any[] }
+
+    const justFinishedDbIds = (notYetFinished ?? []).map((m: any) => m.id as string)
+
+    // 3. Partidos terminados o en vivo con marcador → actualizar resultado
     const withScore = matches.filter((m: any) =>
       ['FINISHED', 'IN_PLAY', 'PAUSED'].includes(m.status) &&
       m.homeTeam?.name && m.awayTeam?.name &&
@@ -219,42 +234,32 @@ export async function GET(request: Request) {
       if (!error) updated++
     }
 
-    // 3. Insertar partidos programados nuevos
-// Reemplaza esto:
-const scheduled = matches.filter((m: any) =>
-  ['SCHEDULED', 'TIMED'].includes(m.status) && 
-  m.homeTeam?.name && m.awayTeam?.name
-)
+    // 4. Insertar/actualizar todos los partidos
+    const toInsert = matches.filter((m: any) => m.homeTeam?.name && m.awayTeam?.name)
 
-// Por esto — inserta TODOS los partidos:
-const toInsert = matches.filter((m: any) =>
-  m.homeTeam?.name && m.awayTeam?.name
-)
+    const rows = toInsert.map((m: any) => ({
+      external_id: String(m.id),
+      tournament:  competition.tournament,
+      home_team:   m.homeTeam.name,
+      away_team:   m.awayTeam.name,
+      home_flag:   FLAG_CODES[m.homeTeam.name] ?? m.homeTeam.tla?.toLowerCase() ?? '',
+      away_flag:   FLAG_CODES[m.awayTeam.name] ?? m.awayTeam.tla?.toLowerCase() ?? '',
+      home_crest:  m.homeTeam.crest ?? null,
+      away_crest:  m.awayTeam.crest ?? null,
+      round:       mapRound(m.stage),
+      group_stage: m.group ?? null,
+      kickoff_at:  m.utcDate,
+      home_score:  m.score?.fullTime?.home ?? null,
+      away_score:  m.score?.fullTime?.away ?? null,
+      status:      mapStatus(m.status),
+      synced_at:   new Date().toISOString(),
+    }))
 
-const rows = toInsert.map((m: any) => ({
-  external_id: String(m.id),
-  tournament:  competition.tournament,
-  home_team:   m.homeTeam.name,
-  away_team:   m.awayTeam.name,
-  home_flag:   FLAG_CODES[m.homeTeam.name] ?? m.homeTeam.tla?.toLowerCase() ?? '',
-  away_flag:   FLAG_CODES[m.awayTeam.name] ?? m.awayTeam.tla?.toLowerCase() ?? '',
-  home_crest:  m.homeTeam.crest ?? null,  // ← escudo del equipo
-  away_crest:  m.awayTeam.crest ?? null,
-  round:       mapRound(m.stage),
-  group_stage: m.group ?? null,
-  kickoff_at:  m.utcDate,
-  home_score:  m.score?.fullTime?.home ?? null,
-  away_score:  m.score?.fullTime?.away ?? null,
-  status:      mapStatus(m.status),
-  synced_at:   new Date().toISOString(),
-}))
-
-    
     const { count: inserted } = await supabase
       .from('matches')
       .upsert(rows, { onConflict: 'external_id', count: 'exact' })
 
-    // 4. Calcular puntos — para finished Y live (marcador parcial también cuenta)
+    // 5. Calcular puntos — para finished Y live
     const { data: scoredInDB } = await supabase
       .from('matches')
       .select('id')
@@ -270,6 +275,13 @@ const rows = toInsert.map((m: any) => ({
       if (!error) calculated++
     }
 
+    // 6. Notificar por email los partidos que recién terminaron (en background)
+    if (justFinishedDbIds.length > 0) {
+      Promise.allSettled(
+        justFinishedDbIds.map(id => notifyMatchResult(id))
+      ).catch(() => {}) // no bloquea la respuesta
+    }
+
     return NextResponse.json({
       ok:         true,
       tournament,
@@ -277,6 +289,7 @@ const rows = toInsert.map((m: any) => ({
       updated,
       inserted,
       calculated,
+      notified:   justFinishedDbIds.length,
       timestamp:  new Date().toISOString(),
     })
 
