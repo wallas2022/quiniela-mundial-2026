@@ -207,18 +207,31 @@ export default function AdminClient({
         body: JSON.stringify({ leagueId }),
       })
       const data = await res.json()
-      if (data.ok) {
-        setSyncResult(
-          data.calculated === 0
-            ? data.message ?? 'No hay partidos terminados aún'
-            : `✓ ${data.calculated} partidos recalculados (${data.tournament})`
-        )
-        router.refresh()
-      } else {
+
+      if (data.error) {
         setSyncResult(`Error: ${data.error}`)
+        return
       }
-    } catch {
-      setSyncResult('Error de red')
+
+      if (data.calculated === 0 && data.total_matches_with_score === 0) {
+        setSyncResult(`Sin partidos con marcador (torneo: ${data.tournament}) — ${data.message ?? ''}`)
+        return
+      }
+
+      if (data.rpc_errors > 0 && data.calculated === 0) {
+        setSyncResult(`RPC error: ${data.first_error ?? 'desconocido'}`)
+        return
+      }
+
+      setSyncResult(
+        `✓ ${data.calculated}/${data.total_matches_with_score} partidos · ` +
+        `${data.total_predictions_found} predicciones · ` +
+        `${data.tournament}` +
+        (data.rpc_errors > 0 ? ` · ${data.rpc_errors} errores` : '')
+      )
+      router.refresh()
+    } catch (e: any) {
+      setSyncResult(`Error de red: ${e.message}`)
     }
     setSyncing(false)
   }
