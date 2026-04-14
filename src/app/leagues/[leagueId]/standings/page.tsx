@@ -42,6 +42,9 @@ export default async function StandingsPage({
       .select('id, display_name'),
   ])
 
+  console.log('SCORES FETCHED:', scoresRes.data?.length, scoresRes.error)
+console.log('SCORES DATA:', scoresRes.data)
+
   const league      = leagueRes.data
   const memberIds   = membersRes.data?.map(m => m.user_id) ?? []
   const scoreMap    = Object.fromEntries((scoresRes.data ?? []).map(s => [s.user_id, s]))

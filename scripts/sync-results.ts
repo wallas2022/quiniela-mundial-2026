@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
-const FOOTBALL_API_KEY    = process.env.FOOTBALL_API_KEY!
+const FOOTBALL_API_KEY     = process.env.FOOTBALL_API_KEY!
 const SUPABASE_URL         = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 
@@ -43,30 +43,51 @@ async function syncTournament(tournament: string, competitionId: number) {
   const data = await res.json()
   const matches = data.matches ?? []
 
-  // Partidos con marcador (finished, live o medio tiempo) → actualizar score + status
+  // DEBUG: inspeccionar partidos en vivo
+  const liveOnes = matches.filter((m: any) =>
+    ['IN_PLAY', 'PAUSED'].includes(m.status)
+  )
+  if (liveOnes.length > 0) {
+    console.log(`  🔴 ${liveOnes.length} en vivo:`)
+    for (const m of liveOnes) {
+      console.log(`     ${m.homeTeam?.name} vs ${m.awayTeam?.name}`)
+      console.log(`       status: ${m.status}`)
+      console.log(`       fullTime:`, m.score?.fullTime)
+      console.log(`       halfTime:`, m.score?.halfTime)
+    }
+  }
+
+  // Partidos con marcador: finished, en vivo o en pausa (medio tiempo)
   const withScore = matches.filter((m: any) =>
     ['FINISHED', 'IN_PLAY', 'PAUSED'].includes(m.status) &&
-    m.homeTeam?.name && m.awayTeam?.name &&
-    m.score?.fullTime?.home !== null && m.score?.fullTime?.home !== undefined
+    m.homeTeam?.name && m.awayTeam?.name
   )
 
   let updated = 0
   for (const m of withScore) {
+    // Para partidos en vivo sin goles aún, la API devuelve null → tratamos como 0
+    const homeScore = m.score?.fullTime?.home ?? 0
+    const awayScore = m.score?.fullTime?.away ?? 0
+
     const { error } = await supabase
       .from('matches')
       .update({
-        home_score: m.score.fullTime.home,
-        away_score: m.score.fullTime.away,
+        home_score: homeScore,
+        away_score: awayScore,
         status:     mapStatus(m.status),
         synced_at:  new Date().toISOString(),
       })
       .eq('external_id', String(m.id))
 
-    if (!error) updated++
+    if (error) {
+      console.error(`  ✗ Error actualizando ${m.id}:`, error.message)
+    } else {
+      updated++
+    }
   }
 
   const live = withScore.filter((m: any) => m.status !== 'FINISHED').length
-  if (updated > 0) console.log(`  ✓ ${updated} actualizados (${live} en vivo)`)
+  console.log(`  ✓ ${updated}/${withScore.length} actualizados (${live} en vivo)`)
 
   return { updated, live }
 }
