@@ -10,6 +10,7 @@ const supabaseAdmin = createClient(
 )
 
 type Standing = {
+  user_id: string
   display_name: string
   total_points: number
   exact_scores: number
@@ -47,12 +48,18 @@ function matchResultEmail({
   appUrl: string
   leagueId: string
 }): string {
-  const pointsColor = pointsEarned >= 5 ? '#4ade80' : pointsEarned >= 3 ? '#60a5fa' : pointsEarned > 0 ? '#94a3b8' : '#6b7280'
+  const pointsColor =
+    pointsEarned >= 5 ? '#4ade80' :
+    pointsEarned >= 3 ? '#60a5fa' :
+    pointsEarned > 0 ? '#94a3b8' :
+    '#6b7280'
+
   const pointsLabel =
     pointsEarned === 5 ? '🎯 ¡Marcador exacto!' :
     pointsEarned === 4 ? '✅ Resultado + diferencia' :
     pointsEarned === 3 ? '✅ Resultado correcto' :
-    pointsEarned === 0 ? '❌ Sin puntos esta vez' : `+${pointsEarned} pts`
+    pointsEarned === 0 ? '❌ Sin puntos esta vez' :
+    `+${pointsEarned} pts`
 
   const top5 = standings.slice(0, 5)
 
@@ -196,11 +203,12 @@ async function notifyLeague({
 
   const standings: Standing[] = memberIds
     .map(uid => ({
-      user_id:         uid,
-      display_name:    profiles.find(p => p.id === uid)?.display_name ?? 'Jugador',
-      total_points:    scoreMap[uid]?.total_points ?? 0,
-      exact_scores:    scoreMap[uid]?.exact_scores ?? 0,
+      user_id: uid,
+      display_name: profiles.find(p => p.id === uid)?.display_name ?? 'Jugador',
+      total_points: scoreMap[uid]?.total_points ?? 0,
+      exact_scores: scoreMap[uid]?.exact_scores ?? 0,
       correct_results: scoreMap[uid]?.correct_results ?? 0,
+      rank: 0,
     }))
     .sort((a, b) => b.total_points - a.total_points)
     .map((s, i) => ({ ...s, rank: i + 1 }))
@@ -228,24 +236,24 @@ async function notifyLeague({
     }))
 
     const html = matchResultEmail({
-      leagueName:   league.name,
-      homeTeam:     match.home_team,
-      awayTeam:     match.away_team,
-      homeScore:    match.home_score,
-      awayScore:    match.away_score,
-      predHome:     pred.pred_home,
-      predAway:     pred.pred_away,
+      leagueName: league.name,
+      homeTeam: match.home_team,
+      awayTeam: match.away_team,
+      homeScore: match.home_score,
+      awayScore: match.away_score,
+      predHome: pred.pred_home,
+      predAway: pred.pred_away,
       pointsEarned: pred.points_earned ?? 0,
-      standings:    standingsWithMe,
+      standings: standingsWithMe,
       myRank,
-      userName:     profile.display_name ?? 'jugador',
+      userName: profile.display_name ?? 'jugador',
       appUrl,
       leagueId,
     })
 
     return resend.emails.send({
-      from:    `Quiniela 2026 <noreply@${process.env.RESEND_FROM_DOMAIN ?? 'resend.dev'}>`,
-      to:      profile.email,
+      from: `Quiniela 2026 <noreply@${process.env.RESEND_FROM_DOMAIN ?? 'resend.dev'}>`,
+      to: profile.email,
       subject: `⚽ ${match.home_team} ${match.home_score}–${match.away_score} ${match.away_team} · ${league.name}`,
       html,
     })
