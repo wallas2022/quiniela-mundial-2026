@@ -1,8 +1,16 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { addLeagueMember } from '../actions'
+
+type Round = { id: string; name: string }
+type Tournament = {
+  id: string
+  name: string
+  season: string
+  available_rounds: Round[]
+}
 
 export default function NewLeaguePage() {
   const supabase = createBrowserClient(
@@ -11,21 +19,49 @@ export default function NewLeaguePage() {
   )
   const router = useRouter()
 
-  const [name, setName]         = useState('')
-  const [fee, setFee]           = useState('50')
-  const [currency, setCurrency] = useState('GTQ')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [name, setName]               = useState('')
+  const [fee, setFee]                 = useState('50')
+  const [currency, setCurrency]       = useState('GTQ')
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState('')
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null)
+  const [selectedRounds, setSelectedRounds]         = useState<string[]>([])
+
+  useEffect(() => {
+    async function loadTournaments() {
+      const { data } = await supabase.from('tournaments').select('*').eq('is_active', true)
+      if (data) {
+        setTournaments(data)
+        setSelectedTournament(data[0])
+        setSelectedRounds(data[0]?.available_rounds.map((r: Round) => r.id) ?? [])
+      }
+    }
+    loadTournaments()
+  }, [])
+
+  function handleTournamentChange(id: string) {
+    const t = tournaments.find(t => t.id === id) ?? null
+    setSelectedTournament(t)
+    setSelectedRounds(t?.available_rounds.map(r => r.id) ?? [])
+  }
+
+  function toggleRound(roundId: string) {
+    setSelectedRounds(prev =>
+      prev.includes(roundId) ? prev.filter(r => r !== roundId) : [...prev, roundId]
+    )
+  }
 
   async function handleCreate() {
-    if (!name.trim()) { setError('Ingresá un nombre para la liga'); return }
+    if (!name.trim())           { setError('Ingresá un nombre para la liga'); return }
+    if (selectedRounds.length === 0) { setError('Seleccioná al menos una ronda'); return }
+
     setLoading(true)
     setError('')
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Crear liga
     const { data: league, error: leagueError } = await supabase
       .from('leagues')
       .insert({
@@ -33,6 +69,12 @@ export default function NewLeaguePage() {
         entry_fee:  parseFloat(fee) || 0,
         currency,
         created_by: user.id,
+        tournament_type:   selectedTournament?.id ?? 'world_cup_2026',
+        tournament_config: {
+          tournament: selectedTournament?.id,
+          rounds:     selectedRounds,
+          season:     selectedTournament?.season,
+        },
       })
       .select()
       .single()
@@ -40,12 +82,13 @@ export default function NewLeaguePage() {
     if (leagueError) { setError(leagueError.message); setLoading(false); return }
 
     try {
-  await addLeagueMember(league.id, user.id)
-} catch (e: any) {
-  setError('Error al configurar la liga: ' + e.message)
-  setLoading(false)
-  return
-}
+      await addLeagueMember(league.id, user.id)
+    } catch (e: any) {
+      setError('Error al configurar la liga: ' + e.message)
+      setLoading(false)
+      return
+    }
+
     router.push(`/leagues/${league.id}`)
   }
 
@@ -59,10 +102,12 @@ export default function NewLeaguePage() {
             ← Volver
           </button>
           <h1 className="text-xl font-semibold">Crear liga</h1>
-          <p className="text-sm text-gray-400 mt-1">Configurá tu quiniela del Mundial</p>
+          <p className="text-sm text-gray-400 mt-1">Configurá tu quiniela</p>
         </div>
 
         <div className="space-y-4">
+
+          {/* Nombre */}
           <div>
             <label className="text-xs text-gray-400 mb-1.5 block">Nombre de la liga</label>
             <input
@@ -75,6 +120,50 @@ export default function NewLeaguePage() {
             />
           </div>
 
+          {/* Torneo */}
+          <div>
+            <label className="text-xs text-gray-400 mb-1.5 block">Torneo</label>
+            <select
+              value={selectedTournament?.id ?? ''}
+              onChange={e => handleTournamentChange(e.target.value)}
+              className="w-full px-4 py-3 text-sm bg-gray-800 border border-gray-700
+                         rounded-xl focus:outline-none focus:border-blue-500 transition"
+            >
+              {tournaments.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.season}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rondas */}
+          {selectedTournament && (
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Rondas a incluir</label>
+              <div className="grid grid-cols-2 gap-2">
+                {selectedTournament.available_rounds.map(round => {
+                  const active = selectedRounds.includes(round.id)
+                  return (
+                    <button
+                      key={round.id}
+                      type="button"
+                      onClick={() => toggleRound(round.id)}
+                      className={`px-3 py-2 text-xs rounded-lg border transition-colors text-left
+                        ${active
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                        }`}
+                    >
+                      {round.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fee y moneda */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-400 mb-1.5 block">Costo de entrada</label>
@@ -103,6 +192,7 @@ export default function NewLeaguePage() {
             </div>
           </div>
 
+          {/* Puntuación */}
           <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
             <div className="text-xs text-gray-400 mb-2">Puntuación</div>
             <div className="space-y-1 text-sm">
@@ -126,7 +216,7 @@ export default function NewLeaguePage() {
 
         <button
           onClick={handleCreate}
-          disabled={loading || !name.trim()}
+          disabled={loading || !name.trim() || selectedRounds.length === 0}
           className="w-full mt-6 py-3 text-sm font-medium bg-blue-600 rounded-xl
                      hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
