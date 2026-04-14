@@ -145,6 +145,8 @@ export default function AdminClient({
   const [modalUrl, setModalUrl]             = useState<string | null>(null)
   const [modalPaymentId, setModalPaymentId] = useState<string | null>(null)
   const [modalStatus, setModalStatus]       = useState<string>('')
+  const [syncing, setSyncing]               = useState(false)
+  const [syncResult, setSyncResult]         = useState<string | null>(null)
 
   // Sincronizar estado cuando el servidor refresca los datos
   useEffect(() => { setLocalMembers(members) },   [members])
@@ -195,6 +197,32 @@ export default function AdminClient({
   })
 }
 
+  async function handleRecalculate() {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/admin/recalculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leagueId }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setSyncResult(
+          data.calculated === 0
+            ? data.message ?? 'No hay partidos terminados aún'
+            : `✓ ${data.calculated} partidos recalculados (${data.tournament})`
+        )
+        router.refresh()
+      } else {
+        setSyncResult(`Error: ${data.error}`)
+      }
+    } catch {
+      setSyncResult('Error de red')
+    }
+    setSyncing(false)
+  }
+
   async function openVoucher(payment: Payment) {
     if (!payment.voucher_url) return
     const { data } = await supabase.storage
@@ -233,7 +261,7 @@ export default function AdminClient({
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-4">
           {[
             { label:'Jugadores', value: approved,                         sub: `${pending} pendientes` },
             { label:'Pozo',      value: `${league.currency} ${pozo}`,     sub: `${approved} aprobados` },
@@ -245,6 +273,35 @@ export default function AdminClient({
               <div className="text-xs text-gray-600 mt-0.5">{s.sub}</div>
             </div>
           ))}
+        </div>
+
+        {/* Recalcular puntos */}
+        <div className="mb-5">
+          <button
+            onClick={handleRecalculate}
+            disabled={syncing}
+            className="w-full py-2.5 text-sm rounded-xl border border-gray-700
+                       text-gray-300 hover:border-blue-600 hover:text-blue-400
+                       transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {syncing ? (
+              <>
+                <span className="animate-spin text-base">⟳</span>
+                Calculando puntos...
+              </>
+            ) : (
+              '⟳ Recalcular tabla de posiciones'
+            )}
+          </button>
+          {syncResult && (
+            <div className={`mt-2 text-xs text-center px-3 py-2 rounded-lg
+              ${syncResult.startsWith('✓')
+                ? 'bg-green-900/30 text-green-400 border border-green-800/50'
+                : syncResult.startsWith('Error')
+                  ? 'bg-red-900/30 text-red-400 border border-red-800/50'
+                  : 'bg-gray-800 text-gray-400'}`}>
+              {syncResult}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-0.5 border-b border-gray-800 mb-5">

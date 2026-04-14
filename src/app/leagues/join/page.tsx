@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function JoinLeaguePage() {
@@ -10,6 +10,7 @@ export default function JoinLeaguePage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
     const router = useRouter()
+    const searchParams = useSearchParams()
 
     const [code, setCode] = useState('')
     const [loading, setLoading] = useState(false)
@@ -18,8 +19,9 @@ export default function JoinLeaguePage() {
     const [joining, setJoining] = useState(false)
     const [joined, setJoined] = useState(false)
 
-    async function handleSearch() {
-        if (!code.trim()) return
+    async function handleSearch(searchCode?: string) {
+        const target = (searchCode ?? code).trim()
+        if (!target) return
         setLoading(true)
         setError('')
         setLeague(null)
@@ -27,7 +29,7 @@ export default function JoinLeaguePage() {
         const { data, error } = await supabase
             .from('leagues')
             .select('id, name, entry_fee, currency, rules_json')
-            .eq('invite_code', code.trim().toLowerCase())
+            .eq('invite_code', target.toLowerCase())
             .single()
 
         if (error || !data) {
@@ -38,6 +40,17 @@ export default function JoinLeaguePage() {
         setLoading(false)
     }
 
+    // Auto-buscar si llega ?code= en la URL
+    useEffect(() => {
+        const param = searchParams.get('code')
+        if (param) {
+            const upper = param.toUpperCase()
+            setCode(upper)
+            handleSearch(upper)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     async function handleJoin() {
         if (!league) return
         setJoining(true)
@@ -46,7 +59,6 @@ export default function JoinLeaguePage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.push('/login'); return }
 
-        // Verificar si ya es miembro
         const { data: existing } = await supabase
             .from('league_members')
             .select('id, status')
@@ -66,7 +78,6 @@ export default function JoinLeaguePage() {
             }
         }
 
-        // Insertar como miembro pendiente
         const { error: joinError } = await supabase
             .from('league_members')
             .insert({
@@ -116,7 +127,7 @@ export default function JoinLeaguePage() {
                        font-mono tracking-widest uppercase transition"
                     />
                     <button
-                        onClick={handleSearch}
+                        onClick={() => handleSearch()}
                         disabled={loading || !code.trim()}
                         className="px-4 py-3 text-sm bg-blue-600 hover:bg-blue-500 rounded-xl
                        disabled:opacity-50 transition-colors font-medium">

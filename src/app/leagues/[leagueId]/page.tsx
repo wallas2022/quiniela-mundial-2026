@@ -2,6 +2,7 @@ import { supabaseServer } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import ShareCard from './ShareCard'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -115,19 +116,11 @@ export default async function LeaguePage({
           </p>
         </div>
 
-        {isAdmin && (
-          <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-6">
-            <div className="text-xs text-gray-400 mb-2">Código de invitación</div>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-mono font-bold tracking-widest text-blue-400">
-                {league.invite_code.toUpperCase()}
-              </span>
-            </div>
-            {pending > 0 && (
-              <div className="mt-3 text-xs text-amber-400">
-                {pending} jugador{pending > 1 ? 'es' : ''} esperando aprobación
-              </div>
-            )}
+        <ShareCard inviteCode={league.invite_code} />
+
+        {isAdmin && pending > 0 && (
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-xl px-4 py-3 mb-6 text-xs text-amber-400">
+            {pending} jugador{pending > 1 ? 'es' : ''} esperando aprobación
           </div>
         )}
 

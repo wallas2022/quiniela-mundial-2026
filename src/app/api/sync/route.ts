@@ -127,6 +127,59 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Torneo no soportado' }, { status: 400 })
   }
 
+  // ── Verificación: solo ejecutar en momentos clave del partido ───────────
+  // Sincroniza si hay partidos LIVE o si el reloj del partido está cerca de:
+  //   minuto 45 (medio tiempo), 90 (final) o 120 (prórroga)
+  // Ventana de ±4 min por momento → con cron cada 5 min siempre cae al menos una vez.
+  const now = new Date()
+  const nowMs = now.getTime()
+
+  // Partidos que podrían estar en curso (kickoff hace menos de 130 min)
+  const windowStart = new Date(nowMs - 130 * 60 * 1000).toISOString()
+  const windowEnd   = new Date(nowMs +   5 * 60 * 1000).toISOString()
+
+  const { data: activeMatches } = await supabase
+    .from('matches')
+    .select('kickoff_at, status')
+    .eq('tournament', competition.tournament)
+    .or('status.eq.live,status.eq.scheduled')
+    .gte('kickoff_at', windowStart)
+    .lte('kickoff_at', windowEnd)
+
+  // Sin partidos en la ventana → skip
+  if (!activeMatches?.length) {
+    return NextResponse.json({
+      ok: true, skipped: true, tournament,
+      reason: 'no hay partidos en vivo ni próximos',
+      timestamp: now.toISOString(),
+    })
+  }
+
+  // Momentos clave (minutos desde el kickoff) con ventana ±4 min
+  const KEY_MINUTES = [45, 90, 120]
+  const BUFFER_MS   = 4 * 60 * 1000
+
+  const shouldSync = activeMatches.some(match => {
+    if (match.status === 'live') return true   // partido marcado live en DB → siempre sync
+
+    const kickoffMs = new Date(match.kickoff_at).getTime()
+    const elapsed   = nowMs - kickoffMs        // ms transcurridos desde kickoff
+
+    return KEY_MINUTES.some(min => {
+      const targetMs = min * 60 * 1000
+      return Math.abs(elapsed - targetMs) <= BUFFER_MS
+    })
+  })
+
+  if (!shouldSync) {
+    return NextResponse.json({
+      ok: true, skipped: true, tournament,
+      reason: 'fuera de ventana (espera min 45, 90 o 120)',
+      timestamp: now.toISOString(),
+    })
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   try {
     const res = await fetch(
       `https://api.football-data.org/v4/competitions/${competition.id}/matches`,
@@ -135,11 +188,6 @@ export async function GET(request: Request) {
     const data = await res.json()
     const matches = data.matches ?? []
 
-
-    console.log('Total matches:', matches.length)
-console.log('Statuses:', [...new Set(matches.map((m: any) => m.status))])
-console.log('Stages:', [...new Set(matches.map((m: any) => m.stage))])
-console.log('Sample match:', JSON.stringify(matches[0], null, 2))
     // 1. Partidos LIVE
     const liveMatches = matches.filter((m: any) => m.status === 'IN_PLAY')
     for (const m of liveMatches) {
@@ -149,19 +197,21 @@ console.log('Sample match:', JSON.stringify(matches[0], null, 2))
         .eq('external_id', String(m.id))
     }
 
-    // 2. Partidos terminados → actualizar resultado
-    const finished = matches.filter((m: any) =>
-      m.status === 'FINISHED' && m.homeTeam?.name && m.awayTeam?.name
+    // 2. Partidos terminados o en vivo con marcador → actualizar resultado
+    const withScore = matches.filter((m: any) =>
+      ['FINISHED', 'IN_PLAY', 'PAUSED'].includes(m.status) &&
+      m.homeTeam?.name && m.awayTeam?.name &&
+      m.score?.fullTime?.home !== null && m.score?.fullTime?.home !== undefined
     )
 
     let updated = 0
-    for (const m of finished) {
+    for (const m of withScore) {
       const { error } = await supabase
         .from('matches')
         .update({
-          home_score: m.score?.fullTime?.home,
-          away_score: m.score?.fullTime?.away,
-          status:     'finished',
+          home_score: m.score.fullTime.home,
+          away_score: m.score.fullTime.away,
+          status:     mapStatus(m.status),
           synced_at:  new Date().toISOString(),
         })
         .eq('external_id', String(m.id))
@@ -204,15 +254,16 @@ const rows = toInsert.map((m: any) => ({
       .from('matches')
       .upsert(rows, { onConflict: 'external_id', count: 'exact' })
 
-    // 4. Calcular puntos
-    const { data: finishedInDB } = await supabase
+    // 4. Calcular puntos — para finished Y live (marcador parcial también cuenta)
+    const { data: scoredInDB } = await supabase
       .from('matches')
       .select('id')
-      .eq('status', 'finished')
+      .in('status', ['finished', 'live'])
       .eq('tournament', competition.tournament)
+      .not('home_score', 'is', null)
 
     let calculated = 0
-    for (const match of finishedInDB ?? []) {
+    for (const match of scoredInDB ?? []) {
       const { error } = await supabase.rpc('calculate_match_points', {
         p_match_id: match.id
       })
