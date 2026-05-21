@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const supabase = createBrowserClient(
@@ -40,7 +41,7 @@ export default function LoginPage() {
         phone:        phone,
       })
     }
-    setMessage('Revisá tu email para confirmar la cuenta')
+    setMessage('Ahora ya puedes ingresar con tu nueva cuenta')
 
   } else {
     // ← este bloque faltaba
@@ -62,6 +63,12 @@ export default function LoginPage() {
           <p className="text-sm text-gray-400 mt-1">
             {mode === 'login' ? 'Iniciá sesión para continuar' : 'Creá tu cuenta'}
           </p>
+                  <Link
+    href="/como-participar"
+    className="text-emerald-100 hover:text-yellow-400 font-semibold underline underline-offset-4 transition-colors"
+  >
+    ¿Cómo participar?
+  </Link>
         </div>
 
         <div className="space-y-3">
