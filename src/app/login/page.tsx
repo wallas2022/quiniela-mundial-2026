@@ -64,11 +64,11 @@ export default function LoginPage() {
             {mode === 'login' ? 'Iniciá sesión para continuar' : 'Creá tu cuenta'}
           </p>
                   <Link
-    href="/como-participar"
-    className="text-emerald-100 hover:text-yellow-400 font-semibold underline underline-offset-4 transition-colors"
-  >
-    ¿Cómo participar?
-  </Link>
+                      href="/como-participar"
+                      className="text-emerald-100 hover:text-yellow-400 font-semibold underline underline-offset-4 transition-colors"
+                                      >
+                      ¿Cómo participar?
+                    </Link>
         </div>
 
         <div className="space-y-3">
