@@ -1,10 +1,17 @@
 'use client'
+import ComoParticiparModal from '@/app/components/ComoParticiparModal'
 import { useState } from 'react'
+
 
 export default function ShareCard({ inviteCode }: { inviteCode: string }) {
     const [copied, setCopied] = useState(false)
 
     const code = inviteCode.toUpperCase()
+    const copiarEnlace = () => {
+  const enlace = `https://quiniela-mundial-2026-pi.vercel.app/unirse/${code}`;
+  navigator.clipboard.writeText(enlace);
+  alert("Enlace copiado");
+};
 
     function handleCopy() {
         const url = `${window.location.origin}/leagues/join?code=${code}`
@@ -16,7 +23,7 @@ export default function ShareCard({ inviteCode }: { inviteCode: string }) {
 
     return (
         <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-6">
-            <div className="text-xs text-gray-400 mb-3">Compartir liga</div>
+            <div className="text-xs text-gray-400 mb-3">Compartir quinela</div>
 
             {/* Código grande */}
             <div className="flex items-center justify-between mb-4">
@@ -25,6 +32,10 @@ export default function ShareCard({ inviteCode }: { inviteCode: string }) {
                     <span className="text-2xl font-mono font-bold tracking-widest text-blue-400">
                         {code}
                     </span>
+                        <div className="flex items-center gap-3">
+                        <button onClick={copiarEnlace}>Copiar enlace de invitación</button>
+                        <ComoParticiparModal />
+                        </div>
                 </div>
                 <span className="text-2xl">🔗</span>
             </div>
