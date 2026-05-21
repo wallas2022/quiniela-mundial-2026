@@ -131,7 +131,7 @@ export default async function HomePage() {
         {/* Mis ligas */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-gray-300">Mis ligas</h2>
+            <h2 className="text-sm font-medium text-gray-300">Mis quinelas</h2>
             <div className="flex gap-2">
               <Link href="/leagues/join"
                 className="text-xs px-3 py-1.5 border border-gray-700 text-gray-400
@@ -143,6 +143,12 @@ export default async function HomePage() {
                            rounded-lg transition-colors">
                 Crear liga
               </Link>
+                      <Link
+    href="/como-participar"
+    className="text-emerald-100 hover:text-yellow-400 font-semibold underline underline-offset-4 transition-colors"
+  >
+    ¿Cómo participar?
+  </Link>
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import ShareCard from './ShareCard'
+import BannerBienvenida from '@/app/components/BannerBienvenida'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +28,8 @@ export default async function LeaguePage({
 
   if (!league) redirect('/')
 
+    
+
   const { data: member } = await supabaseAdmin
     .from('league_members')
     .select('role, status')
@@ -38,6 +41,7 @@ export default async function LeaguePage({
 
   if (member.status === 'pending') {
     return (
+      
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <div className="text-4xl mb-4">⏳</div>
@@ -62,6 +66,13 @@ export default async function LeaguePage({
           <p className="text-sm text-gray-400 mb-6">
             Tu solicitud para unirte a <strong>{league.name}</strong> fue rechazada.
           </p>
+           <Link
+    href="/como-participar"
+    className="text-emerald-100 hover:text-yellow-400 font-semibold underline underline-offset-4 transition-colors"
+  >
+    ¿Cómo participar?
+  </Link>
+
           <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">
             ← Volver al inicio
           </Link>
