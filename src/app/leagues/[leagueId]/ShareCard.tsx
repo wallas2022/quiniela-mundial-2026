@@ -7,8 +7,10 @@ export default function ShareCard({ inviteCode }: { inviteCode: string }) {
     const [copied, setCopied] = useState(false)
 
     const code = inviteCode.toUpperCase()
-    const copiarEnlace = () => {
-  const enlace = `https://quiniela-mundial-2026-pi.vercel.app/unirse/${code}`;
+const copiarEnlace = () => {
+  const baseUrl = window.location.origin;
+  const enlace = `${baseUrl}/unirse/${code}`;
+  // o el formato que uses para invitaciones
   navigator.clipboard.writeText(enlace);
   alert("Enlace copiado");
 };
